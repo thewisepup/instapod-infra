@@ -7,7 +7,7 @@ stack = pulumi.get_stack()
 
 
 # IMPORTANT: push docker image to this ECR repository first before creating the Lambda
-podcast_generation__lambda_repository = aws.ecr.Repository(
+podcast_generation_lambda_repository = aws.ecr.Repository(
     f"podcast-generator-lambda-{stack}",
     name=f"podcast-generator-lambda-{stack}",
     image_tag_mutability="MUTABLE",
@@ -39,20 +39,36 @@ lambda_role_policy_attachment = aws.iam.RolePolicyAttachment(
 )
 
 # Create the Lambda function using the ECR image
-lambda_function = aws.lambda_.Function(
+podcast_generation_lambda = aws.lambda_.Function(
     f"podcast-generator-lambda-{stack}",
     package_type="Image",
-    image_uri=podcast_generation__lambda_repository.repository_url.apply(
+    image_uri=podcast_generation_lambda_repository.repository_url.apply(
         lambda url: f"{url}:latest"
     ),
     role=lambda_role.arn,
-    timeout=300,  # 5 minutes TODO update to 15 min
-    memory_size=1024,  # 1GB TODO figure out new size
+    timeout=900,
+    memory_size=600,
 )
 
+# Create a function URL for the Lambda
+podcast_generation_lambda_function_url = aws.lambda_.FunctionUrl(
+    f"podcast-generator-lambda-url-{stack}",
+    function_name=podcast_generation_lambda.name,
+    authorization_type="NONE",
+    cors={
+        "allow_origins": ["*"],
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["*"],
+        "max_age": 86400,
+    },
+)
 
-# Create an AWS resource (S3 Bucket)
-bucket = aws.s3.BucketV2(f"my-bucket-{stack}")
-
-# Export the name of the bucket
-pulumi.export(f"my-bucket-{stack}", bucket.id)
+# Export all resources
+pulumi.export(
+    "podcast_generation_lambda_repository",
+    podcast_generation_lambda_repository.repository_url,
+)
+pulumi.export("lambda_role", lambda_role.arn)
+pulumi.export("podcast_generation_lambda", podcast_generation_lambda.arn)
+pulumi.export("function_url", podcast_generation_lambda_function_url.function_url)
