@@ -48,6 +48,7 @@ podcast_generation_lambda = aws.lambda_.Function(
     role=lambda_role.arn,
     timeout=900,
     memory_size=600,
+    architectures=["arm64"],
 )
 
 # Create a function URL for the Lambda
